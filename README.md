@@ -9,6 +9,5 @@ You can download the plugin from the Releases page. Or compile it yourself using
 
 # Radio Callsigns file example:
 ```
-HECC_CTR Cairo Radar
-HECA_APP Cairo Director
+MNL_CTR Manila Control
 ```
