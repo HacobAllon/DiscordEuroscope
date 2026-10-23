@@ -36,6 +36,7 @@ namespace DiscordEuroScope_Configuration
 		this->buttons[0] = Button();
 		this->buttons[1] = Button();
 		this->RadioCallsigns.clear();
+		this->webhook = Webhook();
 		for (int i = 0; i < 7; i++)
 		{
 			this->states[i].details = "";

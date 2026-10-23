@@ -79,6 +79,11 @@ namespace DiscordEuroScope_Configuration
 		Button buttons[2];
 	};
 
+	struct Webhook
+	{
+		std::string url;
+	};
+
 	class ConfigData
 	{
 	public:
@@ -90,6 +95,7 @@ namespace DiscordEuroScope_Configuration
 		State states[7];
 		RadioCallsigns_t RadioCallsigns;
 		bool loaded_from_ese = false;
+		Webhook webhook;
 
 		ConfigData();
 

@@ -15,9 +15,7 @@ MNL_CTR Manila Control
 # Using the plugin on Mac or Linux (Wine)
 EuroScope runs under Wine, but Discord runs as a normal Mac or Linux app. Wine can't connect the two on its own, so you need a small free bridge program called [rpc-bridge](https://github.com/EnderIce2/rpc-bridge). You only have to set it up once per Wine prefix (or CrossOver bottle).
 
-When the plugin loads under Wine, it checks for the bridge and shows a message in EuroScope:
-- `Running under Wine ... Discord bridge found.` means you're all set.
-- `... Discord can't be reached from Wine on its own ...` means the bridge isn't running yet. Follow the steps below.
+When the plugin loads under Wine, it checks for the bridge. If it can't find it, it shows `... Discord can't be reached from Wine on its own ...` in EuroScope, which means the bridge isn't running yet. Follow the steps below. If everything is fine it stays quiet; type `.discord hotreload` if you want to see `Running under Wine ... Discord bridge found.`
 
 ## Mac
 1. Download the latest release from the [rpc-bridge releases page](https://github.com/EnderIce2/rpc-bridge/releases) and unzip it.
@@ -40,3 +38,21 @@ flatpak override --user --filesystem=xdg-run/discord-ipc-0 --filesystem=xdg-run/
 ```
 
 To uninstall, run `bridge.exe` again and click **Remove** (on Mac, also run `./launchd.sh remove`).
+
+# Posting ATC chat to a Discord channel
+The plugin can forward messages from the EuroScope ATC chat to a Discord channel, using a webhook. Only ATC chat is posted. Frequency chat, private messages, broadcasts and server messages are never sent. The plugin doesn't post anything on its own when it starts or connects.
+
+1. In Discord, open the channel's settings → **Integrations** → **Webhooks** → **New Webhook**, then click **Copy Webhook URL**.
+2. Open `DiscordEuroscope_config.json` (next to the plugin DLL) and paste the URL into `webhook` → `url`.
+3. In EuroScope, type `.discord hotreload` to load the change. If you want to check it works, type `.discord webhooktest` to send a test message.
+
+Notes:
+- Keep your webhook URL private. Anyone who has it can post to the channel.
+- Messages are posted under your callsign, as `**SENDER:** message`. Several messages that arrive close together are combined into one post.
+- Messages never ping anyone, even if they contain `@everyone` or a mention.
+- If your config file was made by an older version, add this section yourself, or delete the file and restart EuroScope so it's made again:
+```json
+"webhook": {
+    "url": ""
+},
+```

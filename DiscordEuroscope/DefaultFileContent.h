@@ -84,6 +84,9 @@
             \"url\" : \"https://learn.vatphil.com/\"\r\
         }\r\
     ],\r\
+    \"webhook\": {\r\
+        \"url\": \"\"\r\
+    },\r\
     \"radio_callsigns\": {\r\
         \"config\": {\r\
             \"load_from_ese\": false,\r\

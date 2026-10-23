@@ -18,6 +18,7 @@
 #include "inc\\3.2\\EuroScopePlugIn.h"
 #include "inc\\discord_rpc.h"
 #include "ConfigManager.h"
+#include "WebhookSender.h"
 #include <vector>
 #include <map>
 #include <fstream>
@@ -31,13 +32,18 @@ public:
 	DiscordEuroscopeExt();
 	virtual ~DiscordEuroscopeExt();
 	virtual bool OnCompileCommand(const char* sCommandLine);
+	virtual void OnCompilePrivateChat(const char* sSenderCallsign, const char* sReceiverCallsign, const char* sChatMessage);
 	int EuroInittime;
 
 	int CountACinRange();
 	int CountTrackedAC();
-	void CheckWineBridge();
+	void CheckWineBridge(bool announce_ok);
 	std::vector<std::string> tracklist;
 	DiscordEuroScope_Configuration::ConfigManager config;
+
+private:
+	void SendToWebhook(const std::string& line);
+	WebhookSender webhook;
 };
 
 extern DiscordEuroscopeExt* pMyPlugIn;

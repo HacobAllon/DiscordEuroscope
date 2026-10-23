@@ -49,7 +49,7 @@ static bool DiscordPipeExists()
 	return false;
 }
 
-void DiscordEuroscopeExt::CheckWineBridge()
+void DiscordEuroscopeExt::CheckWineBridge(bool announce_ok)
 {
 	const char* wine_version = GetWineVersion();
 	if (wine_version == nullptr)
@@ -59,8 +59,11 @@ void DiscordEuroscopeExt::CheckWineBridge()
 	msg += wine_version;
 	if (DiscordPipeExists())
 	{
-		msg += ". Discord bridge found.";
-		DisplayUserMessage("Message", "DiscordEuroscope", msg.c_str(), true, true, false, true, false);
+		if (announce_ok)
+		{
+			msg += ". Discord bridge found.";
+			DisplayUserMessage("Message", "DiscordEuroscope", msg.c_str(), true, true, false, true, false);
+		}
 		return;
 	}
 	msg += ". Discord can't be reached from Wine on its own, so rich presence won't show.";
@@ -84,11 +87,7 @@ DiscordEuroscopeExt::DiscordEuroscopeExt() : EuroScopePlugIn::CPlugIn(EuroScopeP
 	{
 		if (std::string(e.what()).find("Failed to open") != std::string::npos)
 		{
-			// File cannot be opened, try to generate
-			std::string error_msg = "Error: ";
-			error_msg += e.what();
-			DisplayUserMessage("Message", "DiscordEuroscope", error_msg.c_str(), true, true, false, true, false);
-			DisplayUserMessage("Message", "DiscordEuroscope", "Attempting to generate " CONFIG_FILENAME, true, true, false, true, false);
+			// File cannot be opened (normal on first run), quietly generate it
 			config.GenerateConfigFile(RCPath);
 			try {
 				config.Init(RCPath);
@@ -114,14 +113,10 @@ DiscordEuroscopeExt::DiscordEuroscopeExt() : EuroScopePlugIn::CPlugIn(EuroScopeP
 	memset(&handlers, 0, sizeof(handlers));
 	// handlers
 	Discord_Initialize(static_cast<const char*>(config.Data().discord_appid.c_str()), &handlers, 1, NULL);
-	CheckWineBridge();
+	// Stay quiet on startup; only speak up when something is wrong.
+	CheckWineBridge(false);
 	this->EuroInittime = (int)time(NULL);
 	config.LoadRadioCallsigns();
-
-	char dmsg[40] = { 0 };
-	int count = config.Data().RadioCallsigns.size();
-	sprintf_s(dmsg, 40, "Successfully parsed %i callsign%s", count, count == 1 ? "!" : "s!");
-	DisplayUserMessage("Message", "DiscordEuroscope", dmsg, true, true, false, true, false);
 }
 
 
@@ -408,7 +403,7 @@ bool DiscordEuroscopeExt::OnCompileCommand(const char* sCommandLine)
 			return true;
 		}
 
-		CheckWineBridge();
+		CheckWineBridge(true);
 		this->EuroInittime = (int)time(NULL);
 		config.LoadRadioCallsigns();
 
@@ -418,5 +413,36 @@ bool DiscordEuroscopeExt::OnCompileCommand(const char* sCommandLine)
 		DisplayUserMessage("Message", "DiscordEuroscope", dmsg, true, true, false, true, false);
 		return true;
 	}
+	if (strcmp(sCommandLine, ".discord webhooktest") == 0)
+	{
+		if (!config.isReady() || config.Data().webhook.url.empty())
+		{
+			DisplayUserMessage("Message", "DiscordEuroscope", "No webhook url set in " CONFIG_FILENAME, true, true, false, true, false);
+			return true;
+		}
+		SendToWebhook("Test message from DiscordEuroscope");
+		DisplayUserMessage("Message", "DiscordEuroscope", "Test message sent to the webhook. Check your Discord channel.", true, true, false, true, false);
+		return true;
+	}
 	return false;
+}
+
+void DiscordEuroscopeExt::SendToWebhook(const std::string& line)
+{
+	std::string username = "EuroScope";
+	if (GetConnectionType() != EuroScopePlugIn::CONNECTION_TYPE_NO)
+	{
+		const char* callsign = ControllerMyself().GetCallsign();
+		if (callsign != nullptr && callsign[0] != '\0')
+			username = callsign;
+	}
+	webhook.Enqueue(config.Data().webhook.url, username, line);
+}
+
+void DiscordEuroscopeExt::OnCompilePrivateChat(const char* sSenderCallsign, const char* sReceiverCallsign, const char* sChatMessage)
+{
+	// Only the ATC channel is forwarded.
+	if (!config.isReady() || _stricmp(sReceiverCallsign, "ATC") != 0)
+		return;
+	SendToWebhook(std::string("**") + sSenderCallsign + ":** " + sChatMessage);
 }

@@ -175,6 +175,14 @@ namespace DiscordEuroScope_Configuration
 				}
 			}
 		}
+
+		// Optional, so configs made by older versions still load.
+		if (json_document.HasMember("webhook") && json_document["webhook"].IsObject())
+		{
+			auto& obj = json_document["webhook"];
+			if (obj.HasMember("url") && obj["url"].IsString())
+				data.webhook.url = obj["url"].GetString();
+		}
 		_ready = true;
 	}
 

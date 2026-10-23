@@ -204,6 +204,7 @@
     <ClCompile Include="DiscordEuroscopeExt.cpp" />
     <ClCompile Include="ESEHandler.cpp" />
     <ClCompile Include="MessageFormatter.cpp" />
+    <ClCompile Include="WebhookSender.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Euroscope 3.2|Win32'">Create</PrecompiledHeader>
@@ -260,6 +261,7 @@
     <ClInclude Include="Resource.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
+    <ClInclude Include="WebhookSender.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="DiscordEuroscope.rc" />
