@@ -35,6 +35,7 @@ public:
 
 	int CountACinRange();
 	int CountTrackedAC();
+	void CheckWineBridge();
 	std::vector<std::string> tracklist;
 	DiscordEuroScope_Configuration::ConfigManager config;
 };

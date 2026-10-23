@@ -12,7 +12,7 @@
             \"presence_small_image_key\": \"\",\r\
             \"presence_large_image_key\" : \"\",\r\
             \"state\" : \"\",\r\
-            \"details\" : \"Idle\",\r\
+            \"details\" : \"Taking a break\",\r\
             \"presence_small_image_text\" : \"\",\r\
             \"presence_large_image_text\" : \"\"\r\
         },\r\
@@ -27,7 +27,7 @@
         \"sweatbox\": {\r\
             \"presence_small_image_key\": \"\",\r\
             \"presence_large_image_key\" : \"\",\r\
-            \"state\" : \"sweating someone\",\r\
+            \"state\" : \"making someone sweat\",\r\
             \"details\" : \"Sweatbox\",\r\
             \"presence_small_image_text\" : \"\",\r\
             \"presence_large_image_text\" : \"\"\r\
@@ -43,8 +43,8 @@
             \"if_observer\" : {\r\
                 \"presence_small_image_key\": \"\",\r\
                 \"presence_large_image_key\" : \"\",\r\
-                \"state\" : \"Aircraft in range: {total_inrange}\",\r\
-                \"details\" : \"Observing as {callsign}\",\r\
+                \"state\" : \"\",\r\
+                \"details\" : \"Observing {callsign}\",\r\
                 \"presence_small_image_text\" : \"\",\r\
                 \"presence_large_image_text\" : \"\"\r\
             },\r\
@@ -58,8 +58,12 @@
                 \"presence_large_image_text\" : \"{callsign}\",\r\
                 \"buttons\": [\r\
                     {\r\
-                        \"label\": \"Callsign stats\",\r\
-                        \"url\" : \"https://stats.vatsim.net/search/{callsign}\"\r\
+                        \"label\": \"View my Sector\",\r\
+                        \"url\" : \"https://vatsim-radar.com/?atc={callsign}\"\r\
+                    },\r\
+                    {\r\
+                        \"label\": \"Learn\",\r\
+                        \"url\" : \"https://learn.vatphil.com/\"\r\
                     }\r\
                 ]\r\
             },\r\
@@ -76,12 +80,8 @@
     },\r\
     \"buttons\": [\r\
         {\r\
-            \"label\": \"Feedback\",\r\
-            \"url\" : \"mailto:info@vateg.net\"\r\
-        },\r\
-        {\r\
-            \"label\": \"Download Plugin\",\r\
-            \"url\" : \"https://github.com/Kirollos/DiscordEuroscope/\"\r\
+            \"label\": \"Learn\",\r\
+            \"url\" : \"https://learn.vatphil.com/\"\r\
         }\r\
     ],\r\
     \"radio_callsigns\": {\r\

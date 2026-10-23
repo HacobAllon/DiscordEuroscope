@@ -21,6 +21,53 @@
 #include "ConfigManager.h"
 #include "MessageFormatter.h"
 
+// Returns the Wine version string, or nullptr when running on real Windows.
+static const char* GetWineVersion()
+{
+	HMODULE ntdll = GetModuleHandleA("ntdll.dll");
+	if (ntdll == NULL)
+		return nullptr;
+	typedef const char* (CDECL* wine_get_version_t)(void);
+	wine_get_version_t wine_get_version = (wine_get_version_t)GetProcAddress(ntdll, "wine_get_version");
+	if (wine_get_version == NULL)
+		return nullptr;
+	return wine_get_version();
+}
+
+// Checks whether any discord-ipc pipe exists, without connecting to it.
+static bool DiscordPipeExists()
+{
+	char pipeName[] = "\\\\.\\pipe\\discord-ipc-0";
+	const size_t pipeDigit = sizeof(pipeName) - 2;
+	for (char digit = '0'; digit <= '9'; digit++)
+	{
+		pipeName[pipeDigit] = digit;
+		// Busy (ERROR_SEM_TIMEOUT) still means the pipe exists.
+		if (WaitNamedPipeA(pipeName, 1) || GetLastError() != ERROR_FILE_NOT_FOUND)
+			return true;
+	}
+	return false;
+}
+
+void DiscordEuroscopeExt::CheckWineBridge()
+{
+	const char* wine_version = GetWineVersion();
+	if (wine_version == nullptr)
+		return;
+
+	std::string msg = "Running under Wine ";
+	msg += wine_version;
+	if (DiscordPipeExists())
+	{
+		msg += ". Discord bridge found.";
+		DisplayUserMessage("Message", "DiscordEuroscope", msg.c_str(), true, true, false, true, false);
+		return;
+	}
+	msg += ". Discord can't be reached from Wine on its own, so rich presence won't show.";
+	DisplayUserMessage("Message", "DiscordEuroscope", msg.c_str(), true, true, false, true, false);
+	DisplayUserMessage("Message", "DiscordEuroscope", "Install rpc-bridge (github.com/EnderIce2/rpc-bridge) in this Wine prefix, make sure Discord is open, then type .discord hotreload", true, true, false, true, false);
+}
+
 DiscordEuroscopeExt::DiscordEuroscopeExt() : EuroScopePlugIn::CPlugIn(EuroScopePlugIn::COMPATIBILITY_CODE, "DiscordEuroscope", PLUGIN_VERSION, "Kirollos Nashaat", "GNU GPLv3")
 {
 	char DllPathFile[_MAX_PATH];
@@ -67,6 +114,7 @@ DiscordEuroscopeExt::DiscordEuroscopeExt() : EuroScopePlugIn::CPlugIn(EuroScopeP
 	memset(&handlers, 0, sizeof(handlers));
 	// handlers
 	Discord_Initialize(static_cast<const char*>(config.Data().discord_appid.c_str()), &handlers, 1, NULL);
+	CheckWineBridge();
 	this->EuroInittime = (int)time(NULL);
 	config.LoadRadioCallsigns();
 
@@ -360,6 +408,7 @@ bool DiscordEuroscopeExt::OnCompileCommand(const char* sCommandLine)
 			return true;
 		}
 
+		CheckWineBridge();
 		this->EuroInittime = (int)time(NULL);
 		config.LoadRadioCallsigns();
 
