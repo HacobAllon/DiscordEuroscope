@@ -85,7 +85,6 @@
         }\r\
     ],\r\
     \"webhook\": {\r\
-        \"url\": \"\",\r\
         \"line_format\": \"" WEBHOOK_DEFAULT_LINE_FORMAT "\"\r\
     },\r\
     \"radio_callsigns\": {\r\

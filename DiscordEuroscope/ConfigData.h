@@ -81,7 +81,6 @@ namespace DiscordEuroScope_Configuration
 
 	struct Webhook
 	{
-		std::string url;
 		std::string line_format;
 	};
 

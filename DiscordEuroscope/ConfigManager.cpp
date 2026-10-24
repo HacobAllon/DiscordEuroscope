@@ -132,17 +132,11 @@ namespace DiscordEuroScope_Configuration
 		data.discord_presence_small_image_key = RequireString(json_document, "discord_presence_small_image_key", "");
 		data.sweatbox_bypass = RequireBool(json_document, "sweatbox_bypass", "");
 
-		// Optional: older configs don't have it, and it falls back to the default.
+		// The webhook URL itself is baked into the DLL; only the line format is configurable.
 		data.webhook.line_format = WEBHOOK_DEFAULT_LINE_FORMAT;
 		if (json_document.HasMember("webhook") && json_document["webhook"].IsObject())
 		{
 			const rapidjson::Value& webhook = json_document["webhook"];
-			if (webhook.HasMember("url"))
-			{
-				if (!webhook["url"].IsString())
-					throw std::runtime_error("Config error: webhook.url must be a string.");
-				data.webhook.url = webhook["url"].GetString();
-			}
 			if (webhook.HasMember("line_format"))
 			{
 				if (!webhook["line_format"].IsString())

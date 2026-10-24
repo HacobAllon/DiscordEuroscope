@@ -22,6 +22,9 @@
 #define CONFIG_FILENAME				"DiscordEuroscope_config.json"
 // Used when the config has no webhook.line_format (or it is empty).
 #define WEBHOOK_DEFAULT_LINE_FORMAT	"**{sender}:** {message}"
+// The webhook URL is compiled into the DLL. tools/bake_webhook.py replaces this
+// placeholder in the built DLL; the public release build keeps the placeholder.
+#define WEBHOOK_BAKED_URL_PLACEHOLDER "https://bake.invalid/00000000-0000-0000-0000-000000000000"
 // No longer used by any logic in the code. Only used to be dumped in default .json config file.
 #define DISCORD_APPID				"1563163358042259537"
 #define PRESENCE_LARGE_IMAGE_KEY	"vatphil_banner"

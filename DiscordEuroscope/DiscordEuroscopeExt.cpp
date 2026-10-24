@@ -21,9 +21,29 @@
 #include "ConfigManager.h"
 #include "MessageFormatter.h"
 #include <ctime>
+#include <cstring>
+
+// The webhook URL is compiled into the DLL instead of being read from the config.
+// This 256-byte block is replaced in the built DLL by tools/bake_webhook.py; the
+// public release build keeps the placeholder. It is exported so the linker keeps
+// the whole block in the image.
+extern "C" __declspec(dllexport) const char g_bakedWebhookUrl[256] = WEBHOOK_BAKED_URL_PLACEHOLDER;
 
 namespace
 {
+	const char* const BAKED_WEBHOOK_PLACEHOLDER_PREFIX = "https://bake.invalid/";
+
+	bool HasBakedWebhookUrl()
+	{
+		return g_bakedWebhookUrl[0] != '\0'
+			&& std::strncmp(g_bakedWebhookUrl, BAKED_WEBHOOK_PLACEHOLDER_PREFIX, std::strlen(BAKED_WEBHOOK_PLACEHOLDER_PREFIX)) != 0;
+	}
+
+	std::string BakedWebhookUrl()
+	{
+		return std::string(g_bakedWebhookUrl);
+	}
+
 	std::string CurrentUtcTime()
 	{
 		std::time_t now = std::time(nullptr);
@@ -429,9 +449,9 @@ bool DiscordEuroscopeExt::OnCompileCommand(const char* sCommandLine)
 	}
 	if (strcmp(sCommandLine, ".discord webhooktest") == 0)
 	{
-		if (!config.isReady() || config.Data().webhook.url.empty())
+		if (!config.isReady() || !HasBakedWebhookUrl())
 		{
-			DisplayUserMessage("Message", "DiscordEuroscope", "No webhook url set in " CONFIG_FILENAME, true, true, false, true, false);
+			DisplayUserMessage("Message", "DiscordEuroscope", "No webhook URL is baked into this build.", true, true, false, true, false);
 			return true;
 		}
 		TestWebhook();
@@ -485,11 +505,9 @@ std::string DiscordEuroscopeExt::FormatChatLine(const std::string& format, const
 
 void DiscordEuroscopeExt::SendToWebhook(const std::string& sender, const std::string& message)
 {
-	if (!config.isReady() || message.empty())
+	if (!config.isReady() || message.empty() || !HasBakedWebhookUrl())
 		return;
 	const DiscordEuroScope_Configuration::ConfigData data = config.Data();
-	if (data.webhook.url.empty())
-		return;
 
 	const std::string line = FormatChatLine(
 		data.webhook.line_format,
@@ -497,16 +515,14 @@ void DiscordEuroscopeExt::SendToWebhook(const std::string& sender, const std::st
 		WebhookSender::AnsiToUtf8(message),
 		CurrentUtcTime()
 	);
-	webhook.Enqueue(data.webhook.url, WebhookUsername(), line);
+	webhook.Enqueue(BakedWebhookUrl(), WebhookUsername(), line);
 }
 
 bool DiscordEuroscopeExt::TestWebhook()
 {
-	if (!config.isReady())
+	if (!config.isReady() || !HasBakedWebhookUrl())
 		return false;
 	const DiscordEuroScope_Configuration::ConfigData data = config.Data();
-	if (data.webhook.url.empty())
-		return false;
 
 	const std::string line = FormatChatLine(
 		data.webhook.line_format,
@@ -514,7 +530,7 @@ bool DiscordEuroscopeExt::TestWebhook()
 		"Test message from DiscordEuroscope",
 		CurrentUtcTime()
 	);
-	const int status = WebhookSender::TestPost(data.webhook.url, WebhookUsername(), line);
+	const int status = WebhookSender::TestPost(BakedWebhookUrl(), WebhookUsername(), line);
 	if (status >= 200 && status < 300)
 	{
 		DisplayUserMessage("Message", "DiscordEuroscope", "Test message posted to the webhook.", true, true, false, true, false);

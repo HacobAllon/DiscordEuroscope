@@ -5,35 +5,46 @@ Discord Rich Presence for EuroScope, plus optional forwarding of ATC chat to a D
 ## Quick start
 
 1. Put `DiscordEuroscope.dll` and `DiscordEuroscope_config.json` in the same folder — for VATPHIL that is `RPHI/Plugins/DiscordEuroscope/` in your sector package.
-2. Put your channel webhook URL in the config (see below).
+2. The VATPHIL build already has the webhook URL baked into the DLL; there is no URL setting in the config.
 3. Start EuroScope, then type `.discord webhooktest` to check the webhook.
 
 The plugin stays quiet on startup. It only shows a message when something is wrong (bad config, or Wine without a Discord bridge).
 
 ## Configuration
 
-`DiscordEuroscope_config.json` lives next to `DiscordEuroscope.dll`. After editing it, type `.discord hotreload` in EuroScope — no restart is needed. If the file is missing, the plugin generates it with an empty webhook URL.
+`DiscordEuroscope_config.json` lives next to `DiscordEuroscope.dll`. After editing it, type `.discord hotreload` in EuroScope — no restart is needed. If the file is missing, the plugin generates it.
 
-> The webhook URL is a password. `DiscordEuroscope_config.json` is gitignored; do not commit or share it.
+> The webhook URL is not in the config. It is compiled into the DLL (see below). Keep a baked DLL private.
 
 ### Webhook (ATC chat → Discord)
 
-Create a webhook in the Discord channel: **Channel settings → Integrations → Webhooks → New Webhook → Copy Webhook URL**, then paste it into the config:
+The webhook URL is **baked into the DLL**, not read from the config. The VATPHIL build installed in `RPHI/Plugins/DiscordEuroscope/` is already baked.
+
+The public `vatphil-latest` release DLL is a template containing a placeholder, because publishing a baked DLL would publish the webhook URL. Bake the downloaded DLL before using it:
+
+```
+WEBHOOK_URL='https://discord.com/api/webhooks/...' \
+    python3 tools/bake_webhook.py --dll DiscordEuroscope.dll --out DiscordEuroscope_baked.dll
+```
+
+Then install `DiscordEuroscope_baked.dll` as `DiscordEuroscope.dll`. The URL is passed at bake time and is not stored in this repository.
+
+Only the line format is configurable:
 
 ```json
 "webhook": {
-    "url": "https://discord.com/api/webhooks/...",
     "line_format": "**{sender}:** {message}"
 }
 ```
 
-- `url` — leave empty to disable webhook forwarding.
 - `line_format` — what each chat line looks like in Discord. Missing or empty uses `**{sender}:** {message}`.
 - Placeholders: `{sender}` (callsign), `{message}` (chat text), `{time}` (UTC `HH:MM:SS`). Placeholders are replaced once; braces inside a chat message stay literal.
 - Only the **ATC** chat is forwarded. Frequency chat, private messages, broadcasts and server messages are never posted.
 - Messages are posted under your callsign as the webhook name, and several messages that arrive close together are combined into one post.
 - Mentions are disabled, so `@everyone` and role/user mentions in chat never ping anyone.
 - Messages are sent from a background thread; EuroScope never waits on Discord.
+
+Anyone who has a baked DLL can extract the URL from it, so do not publish or share a baked DLL. The public release intentionally stays a placeholder. If the URL leaks, delete the Discord webhook, create a new one, and bake the DLL again.
 
 If several controllers run the plugin with the same webhook, every instance will post its copy of the chat. Use the webhook on one relay instance only, or use separate webhooks per controller.
 
@@ -84,9 +95,16 @@ Set `load_from_ese` to `true` to read position names directly from the `.ese` fi
 
 ## Building and updating
 
-The `Build VATPHIL plugin` workflow builds the 32-bit DLL on GitHub Actions. It runs automatically on pushes to the `VATPHIL` branch, or manually from the Actions tab. The finished `DiscordEuroscope.dll` is attached to the `vatphil-latest` prerelease.
+The `Build VATPHIL plugin` workflow builds the 32-bit DLL on GitHub Actions. It runs automatically on pushes to the `VATPHIL` branch, or manually from the Actions tab. The finished `DiscordEuroscope.dll` is attached to the `vatphil-latest` prerelease, but it is a **template** with a webhook placeholder.
 
-To install an update, close EuroScope, replace `DiscordEuroscope.dll` in `RPHI/Plugins/DiscordEuroscope/`, keep the config, and start EuroScope again. A DLL swap is not covered by `.discord hotreload` — only config changes are.
+To install a webhook-enabled update, download the DLL and bake it first:
+
+```
+WEBHOOK_URL='https://discord.com/api/webhooks/...' \
+    python3 tools/bake_webhook.py --dll DiscordEuroscope.dll --out DiscordEuroscope_baked.dll
+```
+
+Close EuroScope, replace `DiscordEuroscope.dll` in `RPHI/Plugins/DiscordEuroscope/` with the baked DLL, keep the config, and start EuroScope again. A DLL swap is not covered by `.discord hotreload` — only config changes are.
 
 ## Using the plugin on Mac or Linux (Wine)
 
@@ -123,7 +141,7 @@ To uninstall, run `bridge.exe` again and click **Remove** (on Mac, also run `./l
 
 ## Troubleshooting
 
-- `.discord webhooktest` says **No webhook url set** — add `webhook.url` to the config and run `.discord hotreload`.
+- `.discord webhooktest` says **No webhook URL is baked into this build** — you are running the template DLL; bake it with `tools/bake_webhook.py` and replace the DLL (then restart EuroScope).
 - `.discord webhooktest` reports **404** or **401/403** — the webhook was deleted or the URL is wrong; create/copy it again.
 - `.discord webhooktest` reports **network or URL error** — check the internet connection (and any proxy) for Wine; the webhook does not use Discord IPC.
 - The webhook works but presence is blank — the Discord application ID or image asset key is wrong, or the Discord bridge isn't running under Wine.
