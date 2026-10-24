@@ -242,7 +242,7 @@ namespace DiscordEuroScope_Configuration
 		if (!radio_callsigns.HasMember("custom_callsigns") || !radio_callsigns["custom_callsigns"].IsObject())
 			return;
 
-		auto& obj = radio_callsigns["custom_callsigns"].GetObjectA();
+		auto obj = radio_callsigns["custom_callsigns"].GetObject();
 		for (auto& it : obj)
 		{
 			if (!it.name.IsString() || !it.value.IsString())
