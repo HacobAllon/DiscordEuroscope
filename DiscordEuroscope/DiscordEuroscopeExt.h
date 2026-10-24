@@ -42,7 +42,10 @@ public:
 	DiscordEuroScope_Configuration::ConfigManager config;
 
 private:
-	void SendToWebhook(const std::string& line);
+	void SendToWebhook(const std::string& sender, const std::string& message);
+	bool TestWebhook();
+	std::string WebhookUsername();
+	static std::string FormatChatLine(const std::string& format, const std::string& sender, const std::string& message, const std::string& time);
 	WebhookSender webhook;
 };
 

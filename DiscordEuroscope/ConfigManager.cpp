@@ -25,6 +25,7 @@
 #include <fstream>
 #include <vector>
 #include <regex>
+#include <stdexcept>
 
 const char default_file_content[] = DEFAULT_FILE_CONTENT;
 
@@ -32,6 +33,66 @@ const char default_file_content[] = DEFAULT_FILE_CONTENT;
 static std::string last_fetch_callsign = "";
 static std::string last_returned_rcallsign = "";
 static std::string last_fetch_frequency = "";
+
+namespace
+{
+	std::string JoinPath(const std::string& context, const char* key)
+	{
+		return context.empty() ? std::string(key) : context + "." + key;
+	}
+
+	const rapidjson::Value& RequireObject(const rapidjson::Value& parent, const char* key, const std::string& context)
+	{
+		if (!parent.IsObject() || !parent.HasMember(key) || !parent[key].IsObject())
+			throw std::runtime_error("Config error: " + JoinPath(context, key) + " must be an object.");
+		return parent[key];
+	}
+
+	std::string RequireString(const rapidjson::Value& parent, const char* key, const std::string& context)
+	{
+		if (!parent.IsObject() || !parent.HasMember(key) || !parent[key].IsString())
+			throw std::runtime_error("Config error: " + JoinPath(context, key) + " must be a string.");
+		return std::string(parent[key].GetString());
+	}
+
+	bool RequireBool(const rapidjson::Value& parent, const char* key, const std::string& context)
+	{
+		if (!parent.IsObject() || !parent.HasMember(key) || !parent[key].IsBool())
+			throw std::runtime_error("Config error: " + JoinPath(context, key) + " must be true or false.");
+		return parent[key].GetBool();
+	}
+
+	void FillButtons(DiscordEuroScope_Configuration::Button(&buttons)[2], const rapidjson::Value& object)
+	{
+		if (!object.IsObject() || !object.HasMember("buttons") || !object["buttons"].IsArray())
+			return;
+
+		const auto& arr = object["buttons"].GetArray();
+		rapidjson::SizeType len = arr.Size();
+		if (len > 2)
+			len = 2;
+		for (rapidjson::SizeType i = 0; i < len; i++)
+		{
+			if (!arr[i].IsObject() || !arr[i].HasMember("label") || !arr[i]["label"].IsString())
+				continue;
+			if (!arr[i].HasMember("url") || !arr[i]["url"].IsString())
+				continue;
+			buttons[i] = DiscordEuroScope_Configuration::Button(arr[i]["label"].GetString(), arr[i]["url"].GetString());
+		}
+	}
+
+	void FillState(DiscordEuroScope_Configuration::State& state, const rapidjson::Value& object, const std::string& context)
+	{
+		state.used = true;
+		state.presence_small_image_key = RequireString(object, "presence_small_image_key", context);
+		state.presence_large_image_key = RequireString(object, "presence_large_image_key", context);
+		state.state = RequireString(object, "state", context);
+		state.details = RequireString(object, "details", context);
+		state.presence_small_image_text = RequireString(object, "presence_small_image_text", context);
+		state.presence_large_image_text = RequireString(object, "presence_large_image_text", context);
+		FillButtons(state.buttons, object);
+	}
+}
 
 namespace DiscordEuroScope_Configuration
 {
@@ -50,139 +111,80 @@ namespace DiscordEuroScope_Configuration
 		std::ifstream file_stream(file_path, std::ios_base::in);
 		if (file_stream.fail())
 		{
-			throw std::exception("Failed to open JSON file.");
+			throw std::runtime_error("Failed to open JSON file.");
 		}
 		std::stringstream file_sstream;
 		file_sstream << file_stream.rdbuf();
 
-		if (json_document.Parse(static_cast<const char*>(file_sstream.str().c_str())).HasParseError())
+		const std::string file_contents = file_sstream.str();
+		if (json_document.Parse(file_contents.c_str()).HasParseError())
 		{
 			auto error = json_document.GetParseError();
-			std::string error_str = "Failed to parse the JSON file. Error code: ";
-			error_str += std::to_string(error);
-			throw std::exception(error_str.c_str());
+			throw std::runtime_error("Failed to parse the JSON file. Error code: " + std::to_string(error));
 		}
-
-		assert(json_document.IsObject());
-
-		assert(json_document["discord_appid"].IsString());
-		data.discord_appid = json_document["discord_appid"].GetString();
-		assert(json_document["discord_presence_large_image_key"].IsString());
-		data.discord_presence_large_image_key = json_document["discord_presence_large_image_key"].GetString();
-		assert(json_document["discord_presence_small_image_key"].IsString());
-		data.discord_presence_small_image_key = json_document["discord_presence_small_image_key"].GetString();
-		assert(json_document["sweatbox_bypass"].IsBool());
-		data.sweatbox_bypass = json_document["sweatbox_bypass"].GetBool();
-
-		if (json_document.HasMember("buttons") && json_document["buttons"].IsArray())
+		if (!json_document.IsObject())
 		{
-			auto& arr = json_document["buttons"].GetArray();
-			int len = arr.Size();
-			if (len > 2) {
-				len = 2;
-			}
-			for (int i = 0; i < len; i++)
-			{
-				auto& element = arr[i];
-				assert(arr[i]["label"].IsString());
-				assert(arr[i]["url"].IsString());
-				data.buttons[i] = Button(arr[i]["label"].GetString(), arr[i]["url"].GetString());
-			}
-		}
-		
-		assert(json_document["states"].IsObject());
-		assert(json_document["states"]["idle"].IsObject());
-		assert(json_document["states"]["direct"].IsObject());
-		assert(json_document["states"]["playback"].IsObject());
-		assert(json_document["states"]["sweatbox"].IsObject());
-
-		std::vector<rapidjson::GenericObject<false, rapidjson::Value>> objects;
-
-		objects.push_back(json_document["states"]["idle"].GetObject());
-		objects.push_back(json_document["states"]["playback"].GetObject());
-		objects.push_back(json_document["states"]["sweatbox"].GetObject());
-		objects.push_back(json_document["states"]["direct"].GetObject());
-
-
-		for (int i = 0; i < 4; i++)
-		{
-			data.states[i].used = true;
-			data.states[i].presence_small_image_key = objects[i]["presence_small_image_key"].GetString();
-			data.states[i].presence_large_image_key = objects[i]["presence_large_image_key"].GetString();
-			data.states[i].state = objects[i]["state"].GetString();
-			data.states[i].details = objects[i]["details"].GetString();
-			data.states[i].presence_small_image_text = objects[i]["presence_small_image_text"].GetString();
-			data.states[i].presence_large_image_text = objects[i]["presence_large_image_text"].GetString();
-
-			if (objects[i].HasMember("buttons") && objects[i]["buttons"].IsArray())
-			{
-				auto& arr = objects[i]["buttons"].GetArray();
-				int len = arr.Size();
-				if (len > 2) {
-					len = 2;
-				}
-				for (int j = 0; j < len; j++)
-				{
-					auto& element = arr[j];
-					assert(arr[j]["label"].IsString());
-					assert(arr[j]["url"].IsString());
-					data.states[i].buttons[j] = Button(arr[j]["label"].GetString(), arr[j]["url"].GetString());
-				}
-			}
+			throw std::runtime_error("Config error: the JSON root must be an object.");
 		}
 
-		for (int i = 4; i < 7; i++)
-		{
-			rapidjson::GenericObject<false, rapidjson::Value>* objj;
-			if (i == 4 && json_document["states"]["direct"]["if_observer"].IsObject())
-			{
-				objj = &json_document["states"]["direct"]["if_observer"].GetObject();
-			}
-			else if (i == 5 && json_document["states"]["direct"]["if_controller"].IsObject())
-			{
-				objj = &json_document["states"]["direct"]["if_controller"].GetObject();
-			}
-			else if (i == 6 && json_document["states"]["direct"]["if_supervisor"].IsObject())
-			{
-				objj = &json_document["states"]["direct"]["if_supervisor"].GetObject();
-			}
-			else
-			{
-				continue;
-			}
-			auto& obj = *objj;
-			data.states[i].used = true;
-			data.states[i].presence_small_image_key = obj["presence_small_image_key"].GetString();
-			data.states[i].presence_large_image_key = obj["presence_large_image_key"].GetString();
-			data.states[i].state = obj["state"].GetString();
-			data.states[i].details = obj["details"].GetString();
-			data.states[i].presence_small_image_text = obj["presence_small_image_text"].GetString();
-			data.states[i].presence_large_image_text = obj["presence_large_image_text"].GetString();
+		data.discord_appid = RequireString(json_document, "discord_appid", "");
+		data.discord_presence_large_image_key = RequireString(json_document, "discord_presence_large_image_key", "");
+		data.discord_presence_small_image_key = RequireString(json_document, "discord_presence_small_image_key", "");
+		data.sweatbox_bypass = RequireBool(json_document, "sweatbox_bypass", "");
 
-			if (obj.HasMember("buttons") && obj["buttons"].IsArray())
-			{
-				auto& arr = obj["buttons"].GetArray();
-				int len = arr.Size();
-				if (len > 2) {
-					len = 2;
-				}
-				for (int j = 0; j < len; j++)
-				{
-					auto& element = arr[j];
-					assert(arr[j]["label"].IsString());
-					assert(arr[j]["url"].IsString());
-					data.states[i].buttons[j] = Button(arr[j]["label"].GetString(), arr[j]["url"].GetString());
-				}
-			}
-		}
-
-		// Optional, so configs made by older versions still load.
+		// Optional: older configs don't have it, and it falls back to the default.
+		data.webhook.line_format = WEBHOOK_DEFAULT_LINE_FORMAT;
 		if (json_document.HasMember("webhook") && json_document["webhook"].IsObject())
 		{
-			auto& obj = json_document["webhook"];
-			if (obj.HasMember("url") && obj["url"].IsString())
-				data.webhook.url = obj["url"].GetString();
+			const rapidjson::Value& webhook = json_document["webhook"];
+			if (webhook.HasMember("url"))
+			{
+				if (!webhook["url"].IsString())
+					throw std::runtime_error("Config error: webhook.url must be a string.");
+				data.webhook.url = webhook["url"].GetString();
+			}
+			if (webhook.HasMember("line_format"))
+			{
+				if (!webhook["line_format"].IsString())
+					throw std::runtime_error("Config error: webhook.line_format must be a string.");
+				data.webhook.line_format = webhook["line_format"].GetString();
+			}
+			if (data.webhook.line_format.empty())
+				data.webhook.line_format = WEBHOOK_DEFAULT_LINE_FORMAT;
 		}
+
+		FillButtons(data.buttons, json_document);
+
+		const rapidjson::Value& states = RequireObject(json_document, "states", "");
+		const char* state_names[4] = { "idle", "playback", "sweatbox", "direct" };
+		for (int i = 0; i < 4; i++)
+		{
+			const rapidjson::Value& object = RequireObject(states, state_names[i], "states");
+			FillState(data.states[i], object, std::string("states.") + state_names[i]);
+		}
+
+		const rapidjson::Value& direct = states["direct"];
+		struct NestedState
+		{
+			int index;
+			const char* key;
+		};
+		const NestedState nested_states[3] = {
+			{ 4, "if_observer" },
+			{ 5, "if_controller" },
+			{ 6, "if_supervisor" }
+		};
+		for (int i = 0; i < 3; i++)
+		{
+			if (!direct.HasMember(nested_states[i].key) || !direct[nested_states[i].key].IsObject())
+				continue;
+			FillState(
+				data.states[nested_states[i].index],
+				direct[nested_states[i].key],
+				std::string("states.direct.") + nested_states[i].key
+			);
+		}
+
 		_ready = true;
 	}
 
@@ -198,39 +200,54 @@ namespace DiscordEuroScope_Configuration
 
 	void ConfigManager::LoadRadioCallsigns()
 	{
-		if (!json_document["radio_callsigns"].IsObject()) return;
-		auto& RadioCallsignObj = json_document["radio_callsigns"];
-		auto& RadioCallsignConfigObj = RadioCallsignObj["config"];
-		if (RadioCallsignConfigObj.HasMember("load_from_ese")) {
-			if (RadioCallsignConfigObj["load_from_ese"].IsBool() && RadioCallsignConfigObj["load_from_ese"].GetBool())
+		if (!json_document.HasMember("radio_callsigns") || !json_document["radio_callsigns"].IsObject())
+			return;
+
+		auto& radio_callsigns = json_document["radio_callsigns"];
+		if (radio_callsigns.HasMember("config") && radio_callsigns["config"].IsObject())
+		{
+			auto& radio_config = radio_callsigns["config"];
+			if (radio_config.HasMember("load_from_ese") && radio_config["load_from_ese"].IsBool() && radio_config["load_from_ese"].GetBool())
 			{
+				std::string relative_path = ".\\";
+				if (radio_config.HasMember("path_to_ese") && radio_config["path_to_ese"].IsString())
+					relative_path = radio_config["path_to_ese"].GetString();
+
 				std::string relative_to_absolute_path;
-				std::string relative_path = 
-					RadioCallsignConfigObj.HasMember("path_to_ese") && RadioCallsignConfigObj["path_to_ese"].IsString()
-					? RadioCallsignConfigObj["path_to_ese"].GetString()
-					: ".\\";
-				if (relative_path[1] == ':')
+				if (relative_path.size() > 1 && relative_path[1] == ':')
 					relative_to_absolute_path = relative_path;
 				else
 					relative_to_absolute_path = this->file_path.substr(0, this->file_path.find_last_of('\\') + 1) + relative_path;
-				if (ESEHandler::LocateESEFile(relative_to_absolute_path))
+
+				try
 				{
-					if (ESEHandler::ParsePositions() > 0) {
-						data.loaded_from_ese = true;
-						ESEHandler::GetRadioCallsigns(data.RadioCallsigns);
-						return;
+					if (ESEHandler::LocateESEFile(relative_to_absolute_path))
+					{
+						if (ESEHandler::ParsePositions() > 0)
+						{
+							data.loaded_from_ese = true;
+							ESEHandler::GetRadioCallsigns(data.RadioCallsigns);
+							return;
+						}
 					}
+				}
+				catch (...)
+				{
+					// Fall through to the custom callsigns below.
 				}
 			}
 		}
 
-		assert(RadioCallsignObj.HasMember("custom_callsigns") && RadioCallsignObj["custom_callsigns"].IsObject());
 		data.RadioCallsigns.clear();
-		auto& obj = RadioCallsignObj["custom_callsigns"].GetObjectA();
+		if (!radio_callsigns.HasMember("custom_callsigns") || !radio_callsigns["custom_callsigns"].IsObject())
+			return;
+
+		auto& obj = radio_callsigns["custom_callsigns"].GetObjectA();
 		for (auto& it : obj)
 		{
+			if (!it.name.IsString() || !it.value.IsString())
+				continue;
 			RadioCallsignElement_t element;
-			assert(it.name.IsString() && it.value.IsString());
 			element.callsign = it.name.GetString();
 			element.radio_callsign = it.value.GetString();
 			element.icao = element.callsign.substr(0, element.callsign.find_first_of('_'));

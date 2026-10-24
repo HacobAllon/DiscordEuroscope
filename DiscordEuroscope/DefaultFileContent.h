@@ -3,9 +3,9 @@
 
 #define DEFAULT_FILE_CONTENT  ("\
 {\r\
-    \"discord_appid\": \""DISCORD_APPID"\",\r\
-    \"discord_presence_large_image_key\" : \""PRESENCE_LARGE_IMAGE_KEY"\",\r\
-    \"discord_presence_small_image_key\" : \""PRESENCE_SMALL_IMAGE_KEY"\",\r\
+    \"discord_appid\": \"" DISCORD_APPID "\",\r\
+    \"discord_presence_large_image_key\" : \"" PRESENCE_LARGE_IMAGE_KEY "\",\r\
+    \"discord_presence_small_image_key\" : \"" PRESENCE_SMALL_IMAGE_KEY "\",\r\
     \"sweatbox_bypass\" : false,\r\
     \"states\" : {\r\
         \"idle\": {\r\
@@ -85,7 +85,8 @@
         }\r\
     ],\r\
     \"webhook\": {\r\
-        \"url\": \"\"\r\
+        \"url\": \"\",\r\
+        \"line_format\": \"" WEBHOOK_DEFAULT_LINE_FORMAT "\"\r\
     },\r\
     \"radio_callsigns\": {\r\
         \"config\": {\r\
@@ -93,8 +94,8 @@
             \"path_to_ese\" : \"..\\\\..\\\\\"\r\
         },\r\
         \"custom_callsigns\": {\r\
-            \"^HECC_CTR$\": \"Cairo Control Bandbox\",\r\
-            \"^HECC_(\\\\d+)(?:_)CTR$\" : \"Cairo Control ACC $0\"\r\
+            \"^MNL_CTR$\": \"Manila Control\",\r\
+            \"^MNL_(\\\\d+)(?:_)CTR$\" : \"Manila Control ACC $0\"\r\
         }\r\
     }\r\
 }\r\

@@ -1,0 +1,52 @@
+name: Build VATPHIL plugin
+
+on:
+  push:
+    branches: [ "VATPHIL" ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Add MSBuild to PATH
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Build plugin
+        shell: pwsh
+        run: |
+          msbuild DiscordEuroscope.sln /m /p:Configuration=Release /p:Platform=Win32 /p:OutDir="$env:GITHUB_WORKSPACE\out\" 2>&1 | Tee-Object -FilePath build.log
+          exit $LASTEXITCODE
+
+      - name: Upload DLL artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DiscordEuroscope
+          path: out/DiscordEuroscope.dll
+          if-no-files-found: error
+
+      # The build log is published even when the build fails, so failures can be
+      # diagnosed without access to the Actions log. No secrets are used here.
+      - name: Publish build files to rolling prerelease
+        if: always()
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view vatphil-latest *> $null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create vatphil-latest --target ${{ github.sha }} --prerelease --title "VATPHIL plugin (latest build)" --notes "Automated build from ${{ github.sha }}"
+          }
+          if (Test-Path out\DiscordEuroscope.dll) {
+            gh release upload vatphil-latest out\DiscordEuroscope.dll --clobber
+          }
+          if (Test-Path build.log) {
+            gh release upload vatphil-latest build.log --clobber
+          }

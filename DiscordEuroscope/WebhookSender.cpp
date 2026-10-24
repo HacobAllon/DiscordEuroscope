@@ -14,7 +14,7 @@ static const size_t MAX_QUEUED = 200;
 static const std::chrono::milliseconds SEND_INTERVAL(2500);
 static const int HTTP_TIMEOUT_MS = 5000;
 
-static std::string AnsiToUtf8(const std::string& in)
+std::string WebhookSender::AnsiToUtf8(const std::string& in)
 {
 	if (in.empty())
 		return in;
@@ -62,7 +62,7 @@ void WebhookSender::Enqueue(const std::string& url, const std::string& username,
 {
 	if (url.empty())
 		return;
-	std::string utf8 = AnsiToUtf8(line);
+	std::string utf8 = line;
 	TruncateUtf8(utf8, MAX_CONTENT);
 	{
 		std::lock_guard<std::mutex> guard(lock);
@@ -70,9 +70,14 @@ void WebhookSender::Enqueue(const std::string& url, const std::string& username,
 			return;
 		if (queue.size() >= MAX_QUEUED)
 			queue.pop_front();
-		queue.push_back({ url, AnsiToUtf8(username), utf8 });
+		queue.push_back({ url, username, utf8 });
 	}
 	wake.notify_one();
+}
+
+int WebhookSender::TestPost(const std::string& url, const std::string& username, const std::string& content)
+{
+	return Post(url, username, content);
 }
 
 void WebhookSender::Stop()
@@ -117,7 +122,7 @@ void WebhookSender::Run()
 	}
 }
 
-bool WebhookSender::Post(const std::string& url, const std::string& username, const std::string& content)
+int WebhookSender::Post(const std::string& url, const std::string& username, const std::string& content)
 {
 	rapidjson::StringBuffer body;
 	rapidjson::Writer<rapidjson::StringBuffer> writer(body);
@@ -146,13 +151,13 @@ bool WebhookSender::Post(const std::string& url, const std::string& username, co
 	parts.dwUrlPathLength = (DWORD)-1;
 	parts.dwExtraInfoLength = (DWORD)-1;
 	if (!WinHttpCrackUrl(wurl.c_str(), (DWORD)wurl.size(), 0, &parts))
-		return false;
+		return 0;
 	std::wstring host(parts.lpszHostName, parts.dwHostNameLength);
 	std::wstring path(parts.lpszUrlPath, parts.dwUrlPathLength);
 	if (parts.lpszExtraInfo != NULL)
 		path.append(parts.lpszExtraInfo, parts.dwExtraInfoLength);
 
-	bool ok = false;
+	int http_status = 0;
 	HINTERNET session = WinHttpOpen(L"DiscordEuroscope", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
 	HINTERNET connection = NULL;
 	HINTERNET request = NULL;
@@ -174,12 +179,12 @@ bool WebhookSender::Post(const std::string& url, const std::string& username, co
 		{
 			DWORD status = 0;
 			DWORD size = sizeof(status);
-			WinHttpQueryHeaders(request, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER, WINHTTP_HEADER_NAME_BY_INDEX, &status, &size, WINHTTP_NO_HEADER_INDEX);
-			ok = status >= 200 && status < 300;
+			if (WinHttpQueryHeaders(request, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER, WINHTTP_HEADER_NAME_BY_INDEX, &status, &size, WINHTTP_NO_HEADER_INDEX))
+				http_status = (int)status;
 		}
 	}
 	if (request != NULL) WinHttpCloseHandle(request);
 	if (connection != NULL) WinHttpCloseHandle(connection);
 	if (session != NULL) WinHttpCloseHandle(session);
-	return ok;
+	return http_status;
 }

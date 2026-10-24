@@ -16,8 +16,13 @@ public:
 	WebhookSender();
 	~WebhookSender();
 
-	// Lines are in the system ANSI code page (as EuroScope gives them).
+	// Lines and username are UTF-8. EuroScope chat strings must be converted with AnsiToUtf8 first.
 	void Enqueue(const std::string& url, const std::string& username, const std::string& line);
+	// Sends one message immediately and returns the HTTP status (0 = network/URL error).
+	// Only used by the explicit ".discord webhooktest" command, never by chat.
+	static int TestPost(const std::string& url, const std::string& username, const std::string& content);
+	// EuroScope gives chat text in the system ANSI code page.
+	static std::string AnsiToUtf8(const std::string& in);
 	void Stop();
 
 private:
@@ -29,7 +34,7 @@ private:
 	};
 
 	void Run();
-	static bool Post(const std::string& url, const std::string& username, const std::string& content);
+	static int Post(const std::string& url, const std::string& username, const std::string& content);
 
 	std::deque<Item> queue;
 	std::mutex lock;

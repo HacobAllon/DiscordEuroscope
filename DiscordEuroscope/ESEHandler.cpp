@@ -20,6 +20,7 @@
 #include "ConfigData.h"
 #include <filesystem>
 #include <fstream>
+#include <system_error>
 
 std::vector<std::string> ESEHandler::path_to_ese;
 std::vector<ESEPositionItem> ESEHandler::positions;
@@ -27,7 +28,11 @@ std::vector<ESEPositionItem> ESEHandler::positions;
 bool ESEHandler::LocateESEFile(std::string relative_path_to_ese)
 {
 	path_to_ese.clear();
-	for (auto& file : std::filesystem::directory_iterator(relative_path_to_ese))
+	std::error_code ec;
+	std::filesystem::directory_iterator directory(relative_path_to_ese, ec);
+	if (ec)
+		return false;
+	for (auto& file : directory)
 	{
 		if (file.is_regular_file() && stricmp(file.path().filename().extension().string().c_str(), ".ese") == 0)
 		{

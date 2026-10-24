@@ -16,10 +16,12 @@
 */
 #pragma once
 
-#define PLUGIN_VERSION				("1.3.0")
+#define PLUGIN_VERSION				("1.3.1")
 
 #define UPDATE_TIMER				(1000) // milliseconds
 #define CONFIG_FILENAME				"DiscordEuroscope_config.json"
+// Used when the config has no webhook.line_format (or it is empty).
+#define WEBHOOK_DEFAULT_LINE_FORMAT	"**{sender}:** {message}"
 // No longer used by any logic in the code. Only used to be dumped in default .json config file.
 #define DISCORD_APPID				"1563163358042259537"
 #define PRESENCE_LARGE_IMAGE_KEY	"vatphil_banner"

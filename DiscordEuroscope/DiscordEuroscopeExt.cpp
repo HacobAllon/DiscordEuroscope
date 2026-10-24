@@ -20,6 +20,20 @@
 #include "DiscordEuroscopeExt.h"
 #include "ConfigManager.h"
 #include "MessageFormatter.h"
+#include <ctime>
+
+namespace
+{
+	std::string CurrentUtcTime()
+	{
+		std::time_t now = std::time(nullptr);
+		std::tm utc_buf = {};
+		gmtime_s(&utc_buf, &now);
+		char buffer[16] = { 0 };
+		std::strftime(buffer, sizeof(buffer), "%H:%M:%S", &utc_buf);
+		return std::string(buffer);
+	}
+}
 
 // Returns the Wine version string, or nullptr when running on real Windows.
 static const char* GetWineVersion()
@@ -420,29 +434,117 @@ bool DiscordEuroscopeExt::OnCompileCommand(const char* sCommandLine)
 			DisplayUserMessage("Message", "DiscordEuroscope", "No webhook url set in " CONFIG_FILENAME, true, true, false, true, false);
 			return true;
 		}
-		SendToWebhook("Test message from DiscordEuroscope");
-		DisplayUserMessage("Message", "DiscordEuroscope", "Test message sent to the webhook. Check your Discord channel.", true, true, false, true, false);
+		TestWebhook();
 		return true;
 	}
 	return false;
 }
 
-void DiscordEuroscopeExt::SendToWebhook(const std::string& line)
+std::string DiscordEuroscopeExt::WebhookUsername()
 {
-	std::string username = "EuroScope";
 	if (GetConnectionType() != EuroScopePlugIn::CONNECTION_TYPE_NO)
 	{
-		const char* callsign = ControllerMyself().GetCallsign();
+		EuroScopePlugIn::CController controller = ControllerMyself();
+		const char* callsign = controller.GetCallsign();
 		if (callsign != nullptr && callsign[0] != '\0')
-			username = callsign;
+			return WebhookSender::AnsiToUtf8(callsign);
 	}
-	webhook.Enqueue(config.Data().webhook.url, username, line);
+	return "EuroScope";
+}
+
+std::string DiscordEuroscopeExt::FormatChatLine(const std::string& format, const std::string& sender, const std::string& message, const std::string& time)
+{
+	const std::string effective_format = format.empty() ? std::string(WEBHOOK_DEFAULT_LINE_FORMAT) : format;
+	std::string line;
+	line.reserve(effective_format.size() + sender.size() + message.size());
+	for (size_t i = 0; i < effective_format.size();)
+	{
+		if (effective_format.compare(i, 8, "{sender}") == 0)
+		{
+			line += sender;
+			i += 8;
+		}
+		else if (effective_format.compare(i, 9, "{message}") == 0)
+		{
+			line += message;
+			i += 9;
+		}
+		else if (effective_format.compare(i, 6, "{time}") == 0)
+		{
+			line += time;
+			i += 6;
+		}
+		else
+		{
+			line += effective_format[i];
+			i++;
+		}
+	}
+	return line;
+}
+
+void DiscordEuroscopeExt::SendToWebhook(const std::string& sender, const std::string& message)
+{
+	if (!config.isReady() || message.empty())
+		return;
+	const DiscordEuroScope_Configuration::ConfigData data = config.Data();
+	if (data.webhook.url.empty())
+		return;
+
+	const std::string line = FormatChatLine(
+		data.webhook.line_format,
+		WebhookSender::AnsiToUtf8(sender),
+		WebhookSender::AnsiToUtf8(message),
+		CurrentUtcTime()
+	);
+	webhook.Enqueue(data.webhook.url, WebhookUsername(), line);
+}
+
+bool DiscordEuroscopeExt::TestWebhook()
+{
+	if (!config.isReady())
+		return false;
+	const DiscordEuroScope_Configuration::ConfigData data = config.Data();
+	if (data.webhook.url.empty())
+		return false;
+
+	const std::string line = FormatChatLine(
+		data.webhook.line_format,
+		"EuroScope",
+		"Test message from DiscordEuroscope",
+		CurrentUtcTime()
+	);
+	const int status = WebhookSender::TestPost(data.webhook.url, WebhookUsername(), line);
+	if (status >= 200 && status < 300)
+	{
+		DisplayUserMessage("Message", "DiscordEuroscope", "Test message posted to the webhook.", true, true, false, true, false);
+		return true;
+	}
+
+	std::string error = "Webhook test failed";
+	if (status == 0)
+		error += " (network or URL error; check the connection and the webhook URL).";
+	else if (status == 401 || status == 403)
+		error += " (webhook not authorised; check the URL).";
+	else if (status == 404)
+		error += " (webhook not found; check the URL).";
+	else if (status == 429)
+		error += " (Discord rate limit; try again shortly).";
+	else
+		error += " (HTTP " + std::to_string(status) + ").";
+	DisplayUserMessage("Message", "DiscordEuroscope", error.c_str(), true, true, false, true, false);
+	return false;
 }
 
 void DiscordEuroscopeExt::OnCompilePrivateChat(const char* sSenderCallsign, const char* sReceiverCallsign, const char* sChatMessage)
 {
-	// Only the ATC channel is forwarded.
-	if (!config.isReady() || _stricmp(sReceiverCallsign, "ATC") != 0)
+	// Only the ATC channel is forwarded. Frequency chat, private messages,
+	// broadcasts and server messages must never reach the webhook.
+	if (!config.isReady() || sSenderCallsign == nullptr || sReceiverCallsign == nullptr || sChatMessage == nullptr)
 		return;
-	SendToWebhook(std::string("**") + sSenderCallsign + ":** " + sChatMessage);
+	if (_stricmp(sReceiverCallsign, "ATC") != 0)
+		return;
+	if (sSenderCallsign[0] == '\0' || sChatMessage[0] == '\0' || _stricmp(sSenderCallsign, "server") == 0)
+		return;
+	SendToWebhook(sSenderCallsign, sChatMessage);
 }
