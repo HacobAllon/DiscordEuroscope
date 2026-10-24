@@ -10,7 +10,8 @@ permissions:
 
 jobs:
   build:
-    runs-on: windows-latest
+    # windows-2022 ships the v143 toolset and the ATL/MFC component the plugin needs.
+    runs-on: windows-2022
 
     steps:
       - name: Checkout
